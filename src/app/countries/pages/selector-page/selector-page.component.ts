@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core'
 import { FormBuilder, FormGroup, Validators } from '@angular/forms'
 import { CountriesService } from '../../services/countries.service'
 import { Region, SmallCountry } from '../../interfaces/country.interfaces'
-import { switchMap, tap } from 'rxjs'
+import { filter, switchMap, tap } from 'rxjs'
 
 @Component({
     selector: 'app-selector-page',
@@ -13,29 +13,31 @@ import { switchMap, tap } from 'rxjs'
 export class SelectorPageComponent implements OnInit {
     private _fb: FormBuilder = new FormBuilder()
     public countriesByRegion: SmallCountry[] = []
+    public borders: SmallCountry[] = []
     public myForm: FormGroup = this._fb.group({
         region: ['', Validators.required],
-        countries: ['', Validators.required],
-        borders: ['', Validators.required],
+        country: ['', Validators.required],
+        border: ['', Validators.required],
     })
 
     constructor(private _countriesService: CountriesService) {}
 
     // ya se tiene acceso al formulario y las inyecciones del constructor
     ngOnInit(): void {
-        this.onRegionChange()
+        this.onRegionChanged()
+        this.onCountryChanged()
     }
 
     get regions(): Region[] {
         return this._countriesService.regions
     }
 
-    onRegionChange(): void {
+    onRegionChanged(): void {
         this.myForm
             .get('region')!
             .valueChanges.pipe(
-                // switchMap(this._countriesService.getCountriesByRegion)
-                // tap(() => this.myForm.get('countries')!.setValue('')),
+                tap(() => this.myForm.get('country')!.setValue('')),
+                tap(() => (this.borders = [])),
                 switchMap((region) =>
                     this._countriesService.getCountriesByRegion(region)
                 )
@@ -43,6 +45,26 @@ export class SelectorPageComponent implements OnInit {
             .subscribe((countries) => {
                 // console.log({ region: countries })
                 this.countriesByRegion = countries
+            })
+    }
+
+    onCountryChanged(): void {
+        this.myForm
+            .get('country')!
+            .valueChanges.pipe(
+                tap(() => this.myForm.get('border')!.setValue('')),
+                filter((value: string) => value.length > 0),
+                switchMap((alphaCode) =>
+                    this._countriesService.getCountryByAlphaCode(alphaCode)
+                ),
+                switchMap((country) =>
+                    this._countriesService.getCountryBordersByCodes(
+                        country.borders
+                    )
+                )
+            )
+            .subscribe((countries) => {
+                this.borders = countries
             })
     }
 }
